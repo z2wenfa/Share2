@@ -14,6 +14,8 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+
 import gdut.bsx.share2.Share2;
 import gdut.bsx.share2.ShareContentType;
 
@@ -71,13 +73,19 @@ public class DemoActivity extends AppCompatActivity {
                         .shareBySystem();
                 break;
             case R.id.bt_share_image:
-                  new Share2.Builder(this)
-                          .setContentType(ShareContentType.IMAGE)
-                          .setShareFileUri(getShareFileUri())
-                          //.setShareToComponent("com.tencent.mm", "com.tencent.mm.ui.tools.ShareToTimeLineUI")
-                          .setTitle("Share Image")
-                          .build()
-                          .shareBySystem();
+                // 多图分享
+                ArrayList<Uri> uris = new ArrayList<>();
+                uris.add(getShareFileUri());
+                uris.add(getShareFileUri());
+                new Share2.Builder(this)
+                        .setContentType(ShareContentType.IMAGE)
+                        .setShareFileUri(getShareFileUri())
+                        .setUriList(uris)
+                        .setMulti(true)
+                        //.setShareToComponent("com.tencent.mm", "com.tencent.mm.ui.tools.ShareToTimeLineUI")
+                        .setTitle("Share Image")
+                        .build()
+                        .shareBySystem();
                 break;
             case R.id.bt_share_audio:
                 new Share2.Builder(this)
@@ -133,7 +141,7 @@ public class DemoActivity extends AppCompatActivity {
 
             // String filePath = FileUtil.getFileRealPath(this, shareFileUrl);
             // shareFileUrl = FileUtil.getFileUri(this, null, new File(filePath));
-        } else if (requestCode == REQUEST_SHARE_FILE_CODE){
+        } else if (requestCode == REQUEST_SHARE_FILE_CODE) {
             // todo share complete.
         }
     }

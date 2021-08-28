@@ -11,6 +11,7 @@ import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.Log;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -32,7 +33,8 @@ public class Share2 {
     /**
      * Share content type
      */
-    private @ShareContentType String contentType;
+    private @ShareContentType
+    String contentType;
 
     /**
      * Share title
@@ -69,6 +71,10 @@ public class Share2 {
      */
     private boolean forcedUseSystemChooser;
 
+    private ArrayList<Uri> uriList = new ArrayList<>();
+
+    private boolean isMulti = false;
+
     private Share2(@NonNull Builder builder) {
         this.activity = builder.activity;
         this.contentType = builder.contentType;
@@ -79,12 +85,14 @@ public class Share2 {
         this.componentClassName = builder.componentClassName;
         this.requestCode = builder.requestCode;
         this.forcedUseSystemChooser = builder.forcedUseSystemChooser;
+        this.uriList = builder.uriList;
+        this.isMulti = builder.isMulti;
     }
 
     /**
      * shareBySystem
      */
-    public void shareBySystem () {
+    public void shareBySystem() {
         if (checkShareParam()) {
             Intent shareIntent = createShareIntent();
 
@@ -118,27 +126,36 @@ public class Share2 {
     private Intent createShareIntent() {
         Intent shareIntent = new Intent();
         shareIntent.setAction(Intent.ACTION_SEND);
+
         shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         shareIntent.addCategory("android.intent.category.DEFAULT");
 
-        if (!TextUtils.isEmpty(this.componentPackageName) && !TextUtils.isEmpty(componentClassName)){
+        if (!TextUtils.isEmpty(this.componentPackageName) && !TextUtils.isEmpty(componentClassName)) {
             ComponentName comp = new ComponentName(componentPackageName, componentClassName);
             shareIntent.setComponent(comp);
         }
 
         switch (contentType) {
-            case ShareContentType.TEXT :
+            case ShareContentType.TEXT:
                 shareIntent.putExtra(Intent.EXTRA_TEXT, contentText);
                 shareIntent.setType("text/plain");
                 break;
-            case ShareContentType.IMAGE :
-            case ShareContentType.AUDIO :
-            case ShareContentType.VIDEO :
+            case ShareContentType.IMAGE:
+            case ShareContentType.AUDIO:
+            case ShareContentType.VIDEO:
             case ShareContentType.FILE:
-                shareIntent.setAction(Intent.ACTION_SEND);
+                if (isMulti) {
+                    shareIntent.setAction(Intent.ACTION_SEND_MULTIPLE);
+                }else{
+                    shareIntent.setAction(Intent.ACTION_SEND);
+                }
                 shareIntent.addCategory("android.intent.category.DEFAULT");
                 shareIntent.setType(contentType);
-                shareIntent.putExtra(Intent.EXTRA_STREAM, shareFileUri);
+                if (isMulti) {
+                    shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uriList);
+                } else {
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, shareFileUri);
+                }
                 shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
@@ -146,10 +163,20 @@ public class Share2 {
 
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT) {
                     List<ResolveInfo> resInfoList = activity.getPackageManager().queryIntentActivities(shareIntent, PackageManager.MATCH_DEFAULT_ONLY);
-                    for (ResolveInfo resolveInfo : resInfoList) {
-                        String packageName = resolveInfo.activityInfo.packageName;
-                        activity.grantUriPermission(packageName, shareFileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    if (isMulti) {
+                        for (ResolveInfo resolveInfo : resInfoList) {
+                            String packageName = resolveInfo.activityInfo.packageName;
+                            for (Uri uri : uriList) {
+                                activity.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            }
+                        }
+                    } else {
+                        for (ResolveInfo resolveInfo : resInfoList) {
+                            String packageName = resolveInfo.activityInfo.packageName;
+                            activity.grantUriPermission(packageName, shareFileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        }
                     }
+
                 }
                 break;
             default:
@@ -190,7 +217,8 @@ public class Share2 {
 
     public static class Builder {
         private Activity activity;
-        private @ShareContentType String contentType = ShareContentType.FILE;
+        private @ShareContentType
+        String contentType = ShareContentType.FILE;
         private String title;
         private String componentPackageName;
         private String componentClassName;
@@ -198,6 +226,8 @@ public class Share2 {
         private String textContent;
         private int requestCode = -1;
         private boolean forcedUseSystemChooser = true;
+        private ArrayList<Uri> uriList = new ArrayList<>();
+        private boolean isMulti = false;
 
         public Builder(Activity activity) {
             this.activity = activity;
@@ -205,6 +235,7 @@ public class Share2 {
 
         /**
          * Set Content Type
+         *
          * @param contentType {@link ShareContentType}
          * @return Builder
          */
@@ -215,6 +246,7 @@ public class Share2 {
 
         /**
          * Set Title
+         *
          * @param title title
          * @return Builder
          */
@@ -225,6 +257,7 @@ public class Share2 {
 
         /**
          * Set share file path
+         *
          * @param shareFileUri shareFileUri
          * @return Builder
          */
@@ -235,7 +268,8 @@ public class Share2 {
 
         /**
          * Set text content
-         * @param textContent  textContent
+         *
+         * @param textContent textContent
          * @return Builder
          */
         public Builder setTextContent(String textContent) {
@@ -245,8 +279,9 @@ public class Share2 {
 
         /**
          * Set Share To Component
+         *
          * @param componentPackageName componentPackageName
-         * @param componentClassName componentPackageName
+         * @param componentClassName   componentPackageName
          * @return Builder
          */
         public Builder setShareToComponent(String componentPackageName, String componentClassName) {
@@ -257,26 +292,39 @@ public class Share2 {
 
         /**
          * Set onActivityResult requestCode, default value is -1
+         *
          * @param requestCode requestCode
          * @return Builder
          */
-        public Builder setOnActivityResult (int requestCode) {
+        public Builder setOnActivityResult(int requestCode) {
             this.requestCode = requestCode;
             return this;
         }
 
         /**
          * Forced Use System Chooser To Share
+         *
          * @param enable default is true
          * @return Builder
          */
-        public Builder forcedUseSystemChooser (boolean enable) {
+        public Builder forcedUseSystemChooser(boolean enable) {
             this.forcedUseSystemChooser = enable;
+            return this;
+        }
+
+        public Builder setUriList(ArrayList<Uri> uriList) {
+            this.uriList = uriList;
+            return this;
+        }
+
+        public Builder setMulti(boolean multi) {
+            isMulti = multi;
             return this;
         }
 
         /**
          * build
+         *
          * @return Share2
          */
         public Share2 build() {
